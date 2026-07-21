@@ -1,0 +1,6 @@
+yt-dlp
+opencv-python
+pillow
+requests
+numpy
+torch
