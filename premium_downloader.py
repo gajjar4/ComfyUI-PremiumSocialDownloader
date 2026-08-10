@@ -175,6 +175,7 @@ def fetch_cobalt(url, cobalt_api_url):
         payload = {
             "url": url,
             "videoQuality": "max",
+            "vCodec": "h264",
             "filenameStyle": "basic"
         }
         base_url = cobalt_api_url.rstrip("/")
@@ -246,7 +247,7 @@ def fetch_ytdlp(url, output_dir, file_id):
     print(f"[PremiumDownloader] Attempting download with local yt-dlp: {url}")
     out_tmpl = os.path.join(output_dir, f"{file_id}.%(ext)s")
     ydl_opts = {
-        'format': 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best',
+        'format': 'bv*[ext=mp4][vcodec^=avc]+ba[ext=m4a]/b[ext=mp4][vcodec^=avc]/bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best',
         'outtmpl': out_tmpl,
         'quiet': True,
         'no_warnings': True,
