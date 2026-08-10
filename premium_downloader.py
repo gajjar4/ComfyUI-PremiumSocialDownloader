@@ -246,7 +246,7 @@ def fetch_cobalt_pool(url):
 def fetch_ytdlp(url, output_dir, file_id, cookies_browser="None"):
     print(f"[PremiumDownloader] Attempting download with local yt-dlp: {url}")
     out_tmpl = os.path.join(output_dir, f"{file_id}.%(ext)s")
-    ydl_opts = {
+    base_opts = {
         'format': 'bv*[ext=mp4][vcodec^=avc]+ba[ext=m4a]/b[ext=mp4][vcodec^=avc]/bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best',
         'outtmpl': out_tmpl,
         'quiet': True,
@@ -254,10 +254,10 @@ def fetch_ytdlp(url, output_dir, file_id, cookies_browser="None"):
         'no_check_certificate': True,
         'merge_output_format': 'mp4',
     }
-    if cookies_browser and cookies_browser.lower() != "none":
-        ydl_opts['cookiesfrombrowser'] = (cookies_browser.lower(), None, None, None)
+    
+    # Pass 1: Clean download (no browser cookies, avoids database lock / bad session errors on public videos)
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(base_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
             base_path = os.path.splitext(filename)[0]
@@ -270,8 +270,31 @@ def fetch_ytdlp(url, output_dir, file_id, cookies_browser="None"):
             for f in os.listdir(output_dir):
                 if f.startswith(file_id):
                     return os.path.join(output_dir, f), info
-    except Exception as e:
-        print(f"[PremiumDownloader] yt-dlp failed: {e}")
+    except Exception as e_clean:
+        print(f"[PremiumDownloader] Standard yt-dlp attempt failed: {e_clean}")
+
+    # Pass 2: Authenticated download (only if clean download failed and cookies_browser is specified)
+    if cookies_browser and cookies_browser.lower() != "none":
+        print(f"[PremiumDownloader] Retrying yt-dlp with cookies from '{cookies_browser}'...")
+        cookie_opts = dict(base_opts)
+        cookie_opts['cookiesfrombrowser'] = (cookies_browser.lower(), None, None, None)
+        try:
+            with yt_dlp.YoutubeDL(cookie_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                filename = ydl.prepare_filename(info)
+                base_path = os.path.splitext(filename)[0]
+                for ext in ('.mp4', '.mkv', '.webm', '.avi'):
+                    check_path = base_path + ext
+                    if os.path.exists(check_path):
+                        return check_path, info
+                if os.path.exists(filename):
+                    return filename, info
+                for f in os.listdir(output_dir):
+                    if f.startswith(file_id):
+                        return os.path.join(output_dir, f), info
+        except Exception as e_cookie:
+            print(f"[PremiumDownloader] Cookie-authenticated yt-dlp attempt failed: {e_cookie}")
+
     return None, None
 
 # --- Audio Extractor using FFmpeg ---
