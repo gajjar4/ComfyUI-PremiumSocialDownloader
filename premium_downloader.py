@@ -968,6 +968,6 @@ class PremiumSocialMediaDownloaderNode:
     @classmethod
     def IS_CHANGED(cls, url, max_resolution="720", start_time=0.0, duration=0.0,
                    frame_load_cap=128, select_every_nth=1, force_redownload=False,
-                   custom_download_path="", playlist_data="", unique_id=None):
-        hash_str = f"{url}_{max_resolution}_{start_time}_{duration}_{frame_load_cap}_{select_every_nth}_{force_redownload}_{custom_download_path}_{playlist_data}"
+                   custom_download_path="", cookies_browser="None", playlist_data="", unique_id=None):
+        hash_str = f"{url}_{max_resolution}_{start_time}_{duration}_{frame_load_cap}_{select_every_nth}_{force_redownload}_{custom_download_path}_{cookies_browser}_{playlist_data}"
         return hashlib.md5(hash_str.encode('utf-8')).hexdigest()
