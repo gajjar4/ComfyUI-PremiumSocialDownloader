@@ -403,6 +403,7 @@ def generate_webp_preview(video_path, url_hash, out_fps=29.97):
 # --- API Download Handler Helper ---
 def download_helper(url, max_resolution, custom_download_path="", cookies_browser="None"):
     url = url.strip()
+    clean_url = url.split('?')[0] if ('instagram.com' in url or 'instagr.am' in url) else url
     url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
     
     # Process custom download path if provided
@@ -415,7 +416,6 @@ def download_helper(url, max_resolution, custom_download_path="", cookies_browse
         os.makedirs(downloader_dir, exist_ok=True)
     
     video_output = os.path.join(downloader_dir, f"{url_hash}.mp4")
-    # Cache audio files by start/duration to prevent extraction latency
     audio_output = os.path.join(downloader_dir, f"{url_hash}_trimmed_0.0_0.0.wav")
     images_dir = os.path.join(downloader_dir, f"{url_hash}_images")
     
@@ -435,47 +435,50 @@ def download_helper(url, max_resolution, custom_download_path="", cookies_browse
         cache_hit = True
         
     if not cache_hit:
-        meta = None
-        if platform == 'tiktok':
-            meta = fetch_tikwm(url)
-            if not meta:
-                meta = fetch_cobalt_pool(url)
-        elif platform == 'twitter':
-            meta = fetch_vxtwitter(url)
-            if not meta:
-                meta = fetch_cobalt_pool(url)
+        # 1. Primary: Fast local yt-dlp
+        dl_path, dl_info = fetch_ytdlp(clean_url, downloader_dir, url_hash, cookies_browser)
+        if dl_path and os.path.exists(dl_path):
+            if dl_path != video_output:
+                try: shutil.move(dl_path, video_output)
+                except: pass
+            if dl_info:
+                meta_title = dl_info.get("title", meta_title)
+                meta_author = dl_info.get("uploader", meta_author) or dl_info.get("uploader_id", meta_author)
         else:
-            meta = fetch_cobalt_pool(url)
-            
-        if meta:
-            meta_title = meta.get("title", meta_title)
-            meta_author = meta.get("author", meta_author)
-            
-            if meta.get("image_urls"):
-                os.makedirs(images_dir, exist_ok=True)
-                for i, img_url in enumerate(meta["image_urls"]):
-                    img_path = os.path.join(images_dir, f"img_{i:04d}.jpg")
-                    try:
-                        download_file(img_url, img_path)
-                    except Exception as e:
-                        print(f"[PremiumDownloader] Image Carousel download failed for frame {i}: {e}")
-                is_images_carousel = True
-            elif meta.get("video_url"):
-                try:
-                    download_file(meta["video_url"], video_output)
-                except:
-                    meta = None
-                    
-        if not os.path.exists(video_output) and not is_images_carousel:
-            dl_path, dl_info = fetch_ytdlp(url, downloader_dir, url_hash, cookies_browser)
-            if dl_path and os.path.exists(dl_path):
-                if dl_path != video_output:
-                    shutil.move(dl_path, video_output)
-                if dl_info:
-                    meta_title = dl_info.get("title", meta_title)
-                    meta_author = dl_info.get("uploader", meta_author)
+            # 2. Secondary: Fallback to APIs (carousels / special cases)
+            meta = None
+            if platform == 'tiktok':
+                meta = fetch_tikwm(url)
+                if not meta:
+                    meta = fetch_cobalt_pool(url)
+            elif platform == 'twitter':
+                meta = fetch_vxtwitter(url)
+                if not meta:
+                    meta = fetch_cobalt_pool(url)
             else:
-                return None
+                meta = fetch_cobalt_pool(url)
+                
+            if meta:
+                meta_title = meta.get("title", meta_title)
+                meta_author = meta.get("author", meta_author)
+                
+                if meta.get("image_urls"):
+                    os.makedirs(images_dir, exist_ok=True)
+                    for i, img_url in enumerate(meta["image_urls"]):
+                        img_path = os.path.join(images_dir, f"img_{i:04d}.jpg")
+                        try:
+                            download_file(img_url, img_path)
+                        except Exception as e:
+                            print(f"[PremiumDownloader] Image Carousel download failed for frame {i}: {e}")
+                    is_images_carousel = True
+                elif meta.get("video_url"):
+                    try:
+                        download_file(meta["video_url"], video_output)
+                    except:
+                        meta = None
+
+        if not os.path.exists(video_output) and not is_images_carousel:
+            return None
                 
     # Extract audio (base helper)
     has_audio = False
@@ -674,46 +677,48 @@ class PremiumSocialMediaDownloaderNode:
                 if os.path.exists(images_dir):
                     shutil.rmtree(images_dir, ignore_errors=True)
                     
-                meta = None
-                if platform == 'tiktok':
-                    meta = fetch_tikwm(url)
-                    if not meta:
-                        meta = fetch_cobalt_pool(url)
-                elif platform == 'twitter':
-                    meta = fetch_vxtwitter(url)
-                    if not meta:
-                        meta = fetch_cobalt_pool(url)
+                clean_url = url.split('?')[0] if ('instagram.com' in url or 'instagr.am' in url) else url
+                dl_path, dl_info = fetch_ytdlp(clean_url, downloader_dir, url_hash, cookies_browser)
+                if dl_path and os.path.exists(dl_path):
+                    if dl_path != video_output:
+                        try: shutil.move(dl_path, video_output)
+                        except: pass
+                    if dl_info:
+                        meta_title = dl_info.get("title", meta_title)
+                        meta_author = dl_info.get("uploader", meta_author) or dl_info.get("uploader_id", meta_author)
                 else:
-                    meta = fetch_cobalt_pool(url)
-                    
-                if meta:
-                    meta_title = meta.get("title", meta_title)
-                    meta_author = meta.get("author", meta_author)
-                    if meta.get("image_urls"):
-                        os.makedirs(images_dir, exist_ok=True)
-                        for i, img_url in enumerate(meta["image_urls"]):
-                            img_path = os.path.join(images_dir, f"img_{i:04d}.jpg")
+                    meta = None
+                    if platform == 'tiktok':
+                        meta = fetch_tikwm(url)
+                        if not meta:
+                            meta = fetch_cobalt_pool(url)
+                    elif platform == 'twitter':
+                        meta = fetch_vxtwitter(url)
+                        if not meta:
+                            meta = fetch_cobalt_pool(url)
+                    else:
+                        meta = fetch_cobalt_pool(url)
+                        
+                    if meta:
+                        meta_title = meta.get("title", meta_title)
+                        meta_author = meta.get("author", meta_author)
+                        if meta.get("image_urls"):
+                            os.makedirs(images_dir, exist_ok=True)
+                            for i, img_url in enumerate(meta["image_urls"]):
+                                img_path = os.path.join(images_dir, f"img_{i:04d}.jpg")
+                                try:
+                                    download_file(img_url, img_path)
+                                except Exception as e:
+                                    print(f"[PremiumDownloader] Image Carousel download failed for frame {i}: {e}")
+                            is_images_carousel = True
+                        elif meta.get("video_url"):
                             try:
-                                download_file(img_url, img_path)
-                            except Exception as e:
-                                print(f"[PremiumDownloader] Image Carousel download failed for frame {i}: {e}")
-                        is_images_carousel = True
-                    elif meta.get("video_url"):
-                        try:
-                            download_file(meta["video_url"], video_output)
-                        except:
-                            meta = None
+                                download_file(meta["video_url"], video_output)
+                            except:
+                                meta = None
                             
                 if not os.path.exists(video_output) and not is_images_carousel:
-                    dl_path, dl_info = fetch_ytdlp(url, downloader_dir, url_hash, cookies_browser)
-                    if dl_path and os.path.exists(dl_path):
-                        if dl_path != video_output:
-                            shutil.move(dl_path, video_output)
-                        if dl_info:
-                            meta_title = dl_info.get("title", meta_title)
-                            meta_author = dl_info.get("uploader", meta_author)
-                    else:
-                        raise RuntimeError("[PremiumDownloader] All download methods failed.")
+                    raise RuntimeError("[PremiumDownloader] All download methods failed.")
                         
         # Setup audio extraction with dynamic crop trim (Now properly cached to prevent latency!)
         ffmpeg_bin = get_ffmpeg_path()
