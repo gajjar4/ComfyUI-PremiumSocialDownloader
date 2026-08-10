@@ -764,6 +764,8 @@ app.registerExtension({
                     const maxRes = this.widgets.find(w => w.name === "max_resolution")?.value || "720";
                     const customPathWidget = this.widgets.find(w => w.name === "custom_download_path");
                     const customPath = customPathWidget ? customPathWidget.value : "";
+                    const cookiesWidget = this.widgets.find(w => w.name === "cookies_browser");
+                    const cookiesBrowser = cookiesWidget ? cookiesWidget.value : "None";
 
                     try {
                         const response = await fetch("/premium_downloader/download", {
@@ -772,7 +774,8 @@ app.registerExtension({
                             body: JSON.stringify({ 
                                 url: url, 
                                 max_resolution: maxRes, 
-                                custom_download_path: customPath 
+                                custom_download_path: customPath,
+                                cookies_browser: cookiesBrowser
                             })
                         });
                         const res = await response.json();

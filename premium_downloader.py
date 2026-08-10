@@ -243,7 +243,7 @@ def fetch_cobalt_pool(url):
     return None
 
 # --- yt-dlp Extractor ---
-def fetch_ytdlp(url, output_dir, file_id):
+def fetch_ytdlp(url, output_dir, file_id, cookies_browser="None"):
     print(f"[PremiumDownloader] Attempting download with local yt-dlp: {url}")
     out_tmpl = os.path.join(output_dir, f"{file_id}.%(ext)s")
     ydl_opts = {
@@ -254,6 +254,8 @@ def fetch_ytdlp(url, output_dir, file_id):
         'no_check_certificate': True,
         'merge_output_format': 'mp4',
     }
+    if cookies_browser and cookies_browser.lower() != "none":
+        ydl_opts['cookiesfrombrowser'] = (cookies_browser.lower(), None, None, None)
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -376,7 +378,7 @@ def generate_webp_preview(video_path, url_hash, out_fps=29.97):
     return ""
 
 # --- API Download Handler Helper ---
-def download_helper(url, max_resolution, custom_download_path=""):
+def download_helper(url, max_resolution, custom_download_path="", cookies_browser="None"):
     url = url.strip()
     url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
     
@@ -442,7 +444,7 @@ def download_helper(url, max_resolution, custom_download_path=""):
                     meta = None
                     
         if not os.path.exists(video_output) and not is_images_carousel:
-            dl_path, dl_info = fetch_ytdlp(url, downloader_dir, url_hash)
+            dl_path, dl_info = fetch_ytdlp(url, downloader_dir, url_hash, cookies_browser)
             if dl_path and os.path.exists(dl_path):
                 if dl_path != video_output:
                     shutil.move(dl_path, video_output)
@@ -532,12 +534,13 @@ async def api_download(request):
         url = data.get("url")
         max_res = data.get("max_resolution", "720")
         custom_path = data.get("custom_download_path", "")
+        cookies_browser = data.get("cookies_browser", "None")
         
         if not url:
             return web.json_response({"success": False, "error": "No URL provided"})
             
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, download_helper, url, max_res, custom_path)
+        result = await loop.run_in_executor(None, download_helper, url, max_res, custom_path, cookies_browser)
         
         if result:
             return web.json_response({"success": True, "data": result})
@@ -563,6 +566,7 @@ class PremiumSocialMediaDownloaderNode:
             },
             "optional": {
                 "custom_download_path": ("STRING", {"default": ""}),
+                "cookies_browser": (["None", "chrome", "edge", "firefox", "brave", "opera", "safari", "vivaldi"], {"default": "None"}),
             },
             "hidden": {
                 "playlist_data": "STRING",
@@ -578,7 +582,7 @@ class PremiumSocialMediaDownloaderNode:
 
     def download_and_load(self, url, max_resolution="720", start_time=0.0, duration=0.0,
                           frame_load_cap=128, select_every_nth=1, force_redownload=False,
-                          custom_download_path="", playlist_data="", unique_id=None):
+                          custom_download_path="", cookies_browser="None", playlist_data="", unique_id=None):
                           
         # Initialize default values
         custom_width = 0
@@ -678,7 +682,7 @@ class PremiumSocialMediaDownloaderNode:
                             meta = None
                             
                 if not os.path.exists(video_output) and not is_images_carousel:
-                    dl_path, dl_info = fetch_ytdlp(url, downloader_dir, url_hash)
+                    dl_path, dl_info = fetch_ytdlp(url, downloader_dir, url_hash, cookies_browser)
                     if dl_path and os.path.exists(dl_path):
                         if dl_path != video_output:
                             shutil.move(dl_path, video_output)
