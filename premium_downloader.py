@@ -563,10 +563,10 @@ class PremiumSocialMediaDownloaderNode:
                 "frame_load_cap": ("INT", {"default": 128, "min": 0, "max": 100000, "step": 1}),
                 "select_every_nth": ("INT", {"default": 1, "min": 1, "step": 1}),
                 "force_redownload": ("BOOLEAN", {"default": False}),
+                "cookies_browser": (["None", "chrome", "edge", "firefox", "brave", "opera", "safari", "vivaldi"], {"default": "None"}),
             },
             "optional": {
                 "custom_download_path": ("STRING", {"default": ""}),
-                "cookies_browser": (["None", "chrome", "edge", "firefox", "brave", "opera", "safari", "vivaldi"], {"default": "None"}),
             },
             "hidden": {
                 "playlist_data": "STRING",
