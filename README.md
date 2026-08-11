@@ -73,6 +73,7 @@ The node requires the following libraries (usually pre-installed in most ComfyUI
 *   `select_every_nth` (INT): Read every Nth frame (e.g. `2` loads every other frame).
 *   `force_redownload` (BOOLEAN): Ignores local caches and downloads a fresh copy.
 *   `custom_download_path` (STRING, Optional): Path to save downloads permanently on your PC.
+*   `cookies_browser` (Dropdown): Select your browser (`chrome`, `edge`, `firefox`, `brave`, etc.) to allow downloading private or age-restricted content using your logged-in session. Set to `None` for public content.
 
 ### Outputs
 
@@ -86,3 +87,35 @@ The node requires the following libraries (usually pre-installed in most ComfyUI
 *   `frame_count` (INT): Number of frames returned.
 *   `duration` (FLOAT): Length of returned clip in seconds.
 *   `metadata_text` (STRING): Text summary of all video metadata.
+
+---
+
+## 🔧 Troubleshooting
+
+### Instagram downloads fail with "empty media response"
+
+Instagram frequently changes their API. If downloads stop working, **update yt-dlp** to the latest version:
+
+*   **Portable ComfyUI** (most common):
+    ```bash
+    python_embeded\python.exe -m pip install --upgrade yt-dlp
+    ```
+*   **Standard Python**:
+    ```bash
+    pip install --upgrade yt-dlp
+    ```
+
+Then restart ComfyUI.
+
+### Private / age-restricted content won't download
+
+Set the `cookies_browser` dropdown to the browser where you're logged into Instagram (e.g. `chrome`). Make sure:
+1. You are logged into the platform in that browser
+2. The browser is **closed** while downloading (Chrome locks its cookie database when open)
+
+### Video preview is black / won't play in the node
+
+This happens when the cached video file uses a codec the browser can't play (e.g. AV1, VP9, MJPEG). To fix:
+1. Enable `force_redownload` on the node
+2. Re-add the URL — the updated yt-dlp will fetch an H.264 version that plays in-browser
+
