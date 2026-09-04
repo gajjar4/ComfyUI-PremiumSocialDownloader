@@ -242,6 +242,20 @@ def fetch_cobalt_pool(url):
             print(f"[PremiumDownloader] Cobalt Pool instance {api_url} failed: {e}")
     return None
 
+# --- Cookie File Finder ---
+def find_cookie_file():
+    possible_dirs = [
+        os.path.dirname(os.path.abspath(__file__)),
+        folder_paths.get_input_directory() if hasattr(folder_paths, 'get_input_directory') else None,
+        os.path.abspath('.'),
+    ]
+    for d in possible_dirs:
+        if not d: continue
+        cand = os.path.join(d, "cookies.txt")
+        if os.path.exists(cand) and os.path.getsize(cand) > 0:
+            return cand
+    return None
+
 # --- yt-dlp Extractor ---
 def fetch_ytdlp(url, output_dir, file_id, cookies_browser="None"):
     print(f"[PremiumDownloader] Attempting download with local yt-dlp: {url}")
@@ -255,7 +269,13 @@ def fetch_ytdlp(url, output_dir, file_id, cookies_browser="None"):
         'merge_output_format': 'mp4',
     }
     
-    # Pass 1: Clean download (no browser cookies, avoids database lock / bad session errors on public videos)
+    # Auto-detect cookies.txt file if present
+    cookie_file = find_cookie_file()
+    if cookie_file:
+        print(f"[PremiumDownloader] Using detected cookie file: {cookie_file}")
+        base_opts['cookiefile'] = cookie_file
+    
+    # Pass 1: Clean/file-cookie download
     try:
         with yt_dlp.YoutubeDL(base_opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -273,8 +293,8 @@ def fetch_ytdlp(url, output_dir, file_id, cookies_browser="None"):
     except Exception as e_clean:
         print(f"[PremiumDownloader] Standard yt-dlp attempt failed: {e_clean}")
 
-    # Pass 2: Authenticated download (only if clean download failed and cookies_browser is specified)
-    if cookies_browser and cookies_browser.lower() != "none":
+    # Pass 2: Authenticated download (only if clean download failed and cookies_browser is specified and no cookie_file)
+    if not cookie_file and cookies_browser and cookies_browser.lower() != "none":
         print(f"[PremiumDownloader] Retrying yt-dlp with cookies from '{cookies_browser}'...")
         cookie_opts = dict(base_opts)
         cookie_opts['cookiesfrombrowser'] = (cookies_browser.lower(), None, None, None)
@@ -293,7 +313,10 @@ def fetch_ytdlp(url, output_dir, file_id, cookies_browser="None"):
                     if f.startswith(file_id):
                         return os.path.join(output_dir, f), info
         except Exception as e_cookie:
-            print(f"[PremiumDownloader] Cookie-authenticated yt-dlp attempt failed: {e_cookie}")
+            err_str = str(e_cookie)
+            print(f"[PremiumDownloader] Cookie-authenticated yt-dlp attempt failed: {err_str}")
+            if "Could not copy Chrome cookie database" in err_str or "Permission denied" in err_str:
+                print(f"[PremiumDownloader] >> LOCK NOTICE: {cookies_browser.capitalize()} is open and locking its cookies. Close {cookies_browser.capitalize()}, switch to 'edge', or place 'cookies.txt' in the custom_nodes folder.")
 
     return None, None
 
